@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shoplite/core/di/di.dart';
+import 'package:shoplite/core/router/app_router.dart';
 import 'package:shoplite/features/auth/domain/usecases/login.dart';
 import 'package:shoplite/features/auth/presentation/bloc/login/login_bloc.dart';
 import 'package:shoplite/features/auth/presentation/bloc/login/login_event.dart';
@@ -74,6 +76,7 @@ class _LoginPageViewState extends State<LoginPageView> {
                     ScaffoldMessenger.of(
                       context,
                     ).showSnackBar(SnackBar(content: Text("Login Successful")));
+                    context.go(AppRouters.product);
                   } else if (state.status == LoginStatus.failure) {
                     ScaffoldMessenger.of(
                       context,
@@ -90,7 +93,9 @@ class _LoginPageViewState extends State<LoginPageView> {
                         ),
                       );
                     },
-                    child: Text("Login"),
+                    child: state.status == LoginStatus.loading
+                        ? CircularProgressIndicator()
+                        : Text("Login"),
                   );
                 },
               ),
