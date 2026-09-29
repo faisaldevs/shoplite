@@ -1,4 +1,3 @@
-
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shoplite/core/error/excptions.dart';
@@ -10,10 +9,10 @@ class AuthStorage implements BaseAuthStorage {
   final FlutterSecureStorage _storage;
 
   static const String _accessTokenKey = "access_token_key";
-  static const String _refreshTokenKey = "";
+  static const String _refreshTokenKey = "refresh_token_key";
 
   @override
-  Future<void> clearTokens(String accessToken, String refreshToken) async {
+  Future<void> saveTokens(String accessToken, String refreshToken) async {
     try {
       await Future.wait([
         _storage.write(key: _accessTokenKey, value: accessToken),
@@ -47,7 +46,7 @@ class AuthStorage implements BaseAuthStorage {
   }
 
   @override
-  Future<void> saveTokens(String accessToken, String refreshToken) async {
+  Future<void> clearTokens(String accessToken, String refreshToken) async {
     try {
       await Future.wait([
         _storage.delete(key: _accessTokenKey),

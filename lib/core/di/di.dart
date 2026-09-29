@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shoplite/core/network/dio_client.dart';
 import 'package:shoplite/core/storage/auth_storage.dart';
+import 'package:shoplite/core/storage/base_auth_storage.dart';
 import 'package:shoplite/features/auth/data/datasources/remote/auth_remote_datasource_impl.dart';
 import 'package:shoplite/features/auth/data/datasources/remote/auth_service.dart';
 import 'package:shoplite/features/auth/data/repositories/login_repository_impl.dart';

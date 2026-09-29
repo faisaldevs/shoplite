@@ -11,8 +11,6 @@ abstract class AuthService {
 
   @POST(ApiEndpoints.login)
   Future<LoginResponseModel> login(
-    @Body() String username,
-    @Body() String password,
-    @Body() int expiresInMins,
+    @Body() Map<String, dynamic> credentials,
   );
 }

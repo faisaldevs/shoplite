@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:shoplite/core/error/failure.dart';
-import 'package:shoplite/core/storage/base_auth_storage.dart';
+import 'package:shoplite/core/storage/auth_storage.dart';
 import 'package:shoplite/features/auth/data/datasources/remote/auth_remote_datasource.dart';
 import 'package:shoplite/features/auth/domain/entities/login_entity.dart';
 import 'package:shoplite/features/auth/domain/repositories/login_repository.dart';
@@ -9,7 +9,7 @@ import 'package:shoplite/features/auth/domain/repositories/login_repository.dart
 class LoginRepositoryImpl implements LoginRepository {
   final AuthRemoteDatasource _remoteDatasource;
 
-  final BaseAuthStorage _authStorage;
+  final AuthStorage _authStorage;
 
   LoginRepositoryImpl({
     required this._remoteDatasource,
@@ -24,7 +24,8 @@ class LoginRepositoryImpl implements LoginRepository {
     try {
       final login = await _remoteDatasource.login(username, password);
 
-      _authStorage.saveTokens(login.accessToken, login.refreshToken);
+      await _authStorage.saveTokens(login.accessToken, login.refreshToken);
+
       return Right(login.toEntity());
     } on DioException catch (e) {
       return Left(_mapDioError(e));

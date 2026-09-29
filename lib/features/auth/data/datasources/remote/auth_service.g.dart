@@ -20,15 +20,12 @@ class _AuthService implements AuthService {
   final ParseErrorLogger? errorLogger;
 
   @override
-  Future<LoginResponseModel> login(
-    String username,
-    String password,
-    int expiresInMins,
-  ) async {
+  Future<LoginResponseModel> login(Map<String, dynamic> credentials) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
-    final _data = username;
+    final _data = <String, dynamic>{};
+    _data.addAll(credentials);
     final _options = _setStreamType<LoginResponseModel>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(

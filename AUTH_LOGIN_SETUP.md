@@ -4,7 +4,7 @@ Full login flow in `lib/features/auth/`, plus the `lib/core/` files it depends o
 
 Stack: **Retrofit + Dio** → datasource → repository → `Either<Failure, LoginEntity>` → use case → **LoginBloc** → `LoginPage`. DI via **get_it**, tokens in **flutter_secure_storage**, navigation via **go_router**.
 
-API: `POST https://dummyjson.com/auth/login` with `{ "username", "password", "expiresInMins" }`.
+API: `POST https://dummyjson.com/auth/login` with `{ "username", "password" }` (server default token lifetime).
 
 ---
 
@@ -22,7 +22,7 @@ Login (use case)
    ▼
 LoginRepositoryImpl
    │  _remoteDatasource.login(...)        ── DioException → _mapDioError → Left(Failure)
-   │  _authStorage.saveTokens(access, refresh)
+   │  await _authStorage.saveTokens(access, refresh)
    │  Right(model.toEntity())
    ▼
 AuthRemoteDatasourceImpl → AuthService (Retrofit) → Dio → dummyjson.com
@@ -224,8 +224,6 @@ abstract class BaseAuthStorage {
 
 ## `core/storage/auth_storage.dart`
 
-> ⚠ See issues #2–#3: `saveTokens`/`clearTokens` bodies are swapped and refresh key is `""`.
-
 ```dart
 class AuthStorage implements BaseAuthStorage {
   const AuthStorage(this._storage);
@@ -233,10 +231,10 @@ class AuthStorage implements BaseAuthStorage {
   final FlutterSecureStorage _storage;
 
   static const String _accessTokenKey = "access_token_key";
-  static const String _refreshTokenKey = "";
+  static const String _refreshTokenKey = "refresh_token_key";
 
   @override
-  Future<void> clearTokens(String accessToken, String refreshToken) async {
+  Future<void> saveTokens(String accessToken, String refreshToken) async {
     try {
       await Future.wait([
         _storage.write(key: _accessTokenKey, value: accessToken),
@@ -266,7 +264,7 @@ class AuthStorage implements BaseAuthStorage {
   }
 
   @override
-  Future<void> saveTokens(String accessToken, String refreshToken) async {
+  Future<void> clearTokens(String accessToken, String refreshToken) async {
     try {
       await Future.wait([
         _storage.delete(key: _accessTokenKey),
@@ -321,7 +319,7 @@ class NoParams extends Equatable {
 
 ## `data/datasources/remote/auth_service.dart`
 
-> ⚠ See issue #1: three `@Body()` params → generated code sends **only `username`**.
+A single `@Body()` map; the generated code does `_data.addAll(credentials)`, so the JSON body contains both fields.
 
 ```dart
 part 'auth_service.g.dart';
@@ -332,9 +330,7 @@ abstract class AuthService {
 
   @POST(ApiEndpoints.login)
   Future<LoginResponseModel> login(
-    @Body() String username,
-    @Body() String password,
-    @Body() int expiresInMins,
+    @Body() Map<String, dynamic> credentials,
   );
 }
 ```
@@ -357,7 +353,7 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
 
   @override
   Future<LoginResponseModel> login(String username, String password) {
-    return _authService.login(username, password, 1);
+    return _authService.login({'username': username, 'password': password});
   }
 }
 ```
@@ -408,12 +404,12 @@ class LoginResponseModel {
 
 ## `data/repositories/login_repository_impl.dart`
 
-Maps `DioException` → `Failure`: timeouts/connection → `NetworkFailure`, 401 → `UnauthorizedFailure`, other bad responses → `ServerFailure(message from body['message'])`, anything else → `UnknownFailure`.
+Depends on the concrete `AuthStorage` (see issue #11). Maps `DioException` → `Failure`: timeouts/connection → `NetworkFailure`, 401 → `UnauthorizedFailure`, other bad responses → `ServerFailure(message from body['message'])`, anything else → `UnknownFailure`.
 
 ```dart
 class LoginRepositoryImpl implements LoginRepository {
   final AuthRemoteDatasource _remoteDatasource;
-  final BaseAuthStorage _authStorage;
+  final AuthStorage _authStorage;
 
   LoginRepositoryImpl({
     required this._remoteDatasource,
@@ -425,7 +421,8 @@ class LoginRepositoryImpl implements LoginRepository {
     try {
       final login = await _remoteDatasource.login(username, password);
 
-      _authStorage.saveTokens(login.accessToken, login.refreshToken);
+      await _authStorage.saveTokens(login.accessToken, login.refreshToken);
+
       return Right(login.toEntity());
     } on DioException catch (e) {
       return Left(_mapDioError(e));
@@ -689,42 +686,23 @@ class _LoginPageViewState extends State<LoginPageView> {
 
 | # | File | Issue | Effect |
 |---|---|---|---|
-| 1 | `auth_service.dart` | 3× `@Body()` on primitives. Generated code: `final _data = username;` | Request body is just the username string → login **always fails** (400) |
-| 2 | `auth_storage.dart` | `saveTokens` deletes, `clearTokens` writes | Tokens never persisted after login |
-| 3 | `auth_storage.dart` | `_refreshTokenKey = ""` | Empty key; refresh token read/write unreliable |
-| 4 | `base_auth_storage.dart` | `clearTokens` / `getAccessToken` / `getRefreshToken` take unused params | Awkward API |
-| 5 | `login_repository_impl.dart` | `saveTokens(...)` not awaited; `CacheException` swallowed as `UnknownFailure` | Storage errors silent / misreported |
-| 6 | `auth_remote_datasource_impl.dart` | `expiresInMins: 1` | Token expires after 1 min |
+| 1 | `auth_service.dart` | ~~3× `@Body()` on primitives~~ | **Fixed** — single `Map` body, `.g.dart` regenerated |
+| 2 | `auth_storage.dart` | ~~`saveTokens`/`clearTokens` swapped~~ | **Fixed** |
+| 3 | `auth_storage.dart` | ~~`_refreshTokenKey = ""`~~ | **Fixed** → `"refresh_token_key"` |
+| 4 | `base_auth_storage.dart` | `clearTokens` / `getAccessToken` / `getRefreshToken` take unused params | Open — awkward API |
+| 5 | `login_repository_impl.dart` | ~~`saveTokens` not awaited~~ **Fixed**. Still open: `CacheException` is swallowed as `UnknownFailure` | Storage errors misreported |
+| 6 | `auth_remote_datasource_impl.dart` | ~~`expiresInMins: 1`~~ | **Fixed** — no longer sent; server default applies |
 | 7 | `failure.dart` | `props => []` | All `Failure`s compare equal (breaks tests / Equatable dedupe) |
 | 8 | `login_state.dart` | Not `Equatable`; `copyWith` can't clear `error` | Stale error after retry |
 | 9 | `login_bloc.dart` | `concurrent()` | Double tap = two login requests. Use `droppable()` |
 | 10 | `login_page.dart` | Password not obscured; no validators though `Form` key exists; snackbar ignores `state.error`; button tappable while loading | UX / security |
-| 11 | `di.dart` | Registers concrete types (`AuthRemoteDatasourceImpl`, `LoginRepositoryImpl`) not abstractions; `LoginBloc` registered as singleton but page builds its own | Harder to mock; unused registration (and a singleton bloc would be closed by `BlocProvider`) |
+| 11 | `di.dart`, `login_repository_impl.dart` | Registers/depends on concrete types (`AuthRemoteDatasourceImpl`, `LoginRepositoryImpl`, `AuthStorage`) not abstractions (`sl<BaseAuthStorage>()` was unregistered and would throw, so the repo now takes `AuthStorage`); `LoginBloc` registered as singleton but page builds its own | Harder to mock; unused registration (and a singleton bloc would be closed by `BlocProvider`) |
 | 12 | `login.dart` | Doesn't implement `UseCase<T, Params>` | Inconsistent with `core/usecase` |
 | 13 | `splash_page.dart` | Both branches go to `/login` | No auto-login |
 
-### Fix 1 — send JSON body
+### Fix 4 — storage signatures (remaining)
 
-```dart
-@POST(ApiEndpoints.login)
-Future<LoginResponseModel> login(@Body() Map<String, dynamic> body);
-```
-
-```dart
-// auth_remote_datasource_impl.dart
-@override
-Future<LoginResponseModel> login(String username, String password) {
-  return _authService.login({
-    'username': username,
-    'password': password,
-    'expiresInMins': 30,
-  });
-}
-```
-
-Then rerun `build_runner`.
-
-### Fix 2–4 — storage
+Swap/key bugs are already fixed; this removes the unused params.
 
 ```dart
 abstract class BaseAuthStorage {
