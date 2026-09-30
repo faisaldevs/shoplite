@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shoplite/core/di/di.dart';
+import 'package:shoplite/core/router/app_router.dart';
+import 'package:shoplite/features/auth/domain/usecases/logout.dart';
 import 'package:shoplite/features/product/domain/entities/product_entity.dart';
 import 'package:shoplite/features/product/presentation/bloc/product_bloc.dart';
+
 
 class ProductPage extends StatelessWidget {
   const ProductPage({super.key});
@@ -58,7 +62,20 @@ class _ProductPageViewState extends State<ProductPageView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Product List'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Product List'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: () async {
+              await sl<Logout>()();
+              if (context.mounted) context.go(AppRouters.login);
+            },
+          ),
+        ],
+      ),
       body: BlocBuilder<ProductBloc, ProductState>(
         builder: (context, state) {
           if (state.status == ProductStatus.initial ||

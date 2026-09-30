@@ -1,23 +1,34 @@
 import 'package:dio/dio.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:shoplite/core/error/failure.dart';
-import 'package:shoplite/core/storage/auth_storage.dart';
+import 'package:shoplite/core/storage/base_auth_storage.dart';
 import 'package:shoplite/features/auth/data/datasources/remote/auth_remote_datasource.dart';
 import 'package:shoplite/features/auth/domain/entities/login_entity.dart';
-import 'package:shoplite/features/auth/domain/repositories/login_repository.dart';
+import 'package:shoplite/features/auth/domain/repositories/auth_repository.dart';
 
-class LoginRepositoryImpl implements LoginRepository {
+class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDatasource _remoteDatasource;
 
-  final AuthStorage _authStorage;
+  final BaseAuthStorage _authStorage;
 
-  LoginRepositoryImpl({
+  AuthRepositoryImpl({
     required this._remoteDatasource,
     required this._authStorage,
   });
 
+  // dummyjson has no logout endpoint, so logout = forget the tokens.
   @override
-  Future<Either<Failure, LoginEntity>> call(
+  Future<void> logout() => _authStorage.clearTokens();
+
+  // Only checks a token exists. If it expired, AuthInterceptor refreshes it
+  // on the first request.
+  @override
+  Future<bool> isLoggedIn() async {
+    return await _authStorage.getAccessToken() != null;
+  }
+
+  @override
+  Future<Either<Failure, LoginEntity>> login(
     String username,
     String password,
   ) async {

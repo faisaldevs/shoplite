@@ -9,6 +9,10 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
 
   @override
   Future<LoginResponseModel> login(String username, String password) {
-    return _authService.login({'username': username, 'password': password});
+    return _authService.login({
+      'username': username,
+      'password': password,
+      "expiresInMins": 1,
+    });
   }
 }

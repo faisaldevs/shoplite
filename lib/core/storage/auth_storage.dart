@@ -24,7 +24,7 @@ class AuthStorage implements BaseAuthStorage {
   }
 
   @override
-  Future<String?> getAccessToken(String accessToken) async {
+  Future<String?> getAccessToken() async {
     try {
       return await _storage.read(key: _accessTokenKey);
     } on PlatformException catch (e) {
@@ -35,7 +35,7 @@ class AuthStorage implements BaseAuthStorage {
   }
 
   @override
-  Future<String?> getRefreshToken(String refreshToken) async {
+  Future<String?> getRefreshToken() async {
     try {
       return await _storage.read(key: _refreshTokenKey);
     } on PlatformException catch (e) {
@@ -46,7 +46,7 @@ class AuthStorage implements BaseAuthStorage {
   }
 
   @override
-  Future<void> clearTokens(String accessToken, String refreshToken) async {
+  Future<void> clearTokens() async {
     try {
       await Future.wait([
         _storage.delete(key: _accessTokenKey),

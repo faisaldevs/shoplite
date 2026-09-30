@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shoplite/features/auth/domain/usecases/is_logged_in.dart';
 
 enum SplashStatus { loading, authenticated, unauthenticated, failure }
 
@@ -9,24 +10,15 @@ class SplashState {
 }
 
 class SplashCubit extends Cubit<SplashState> {
-  SplashCubit() : super(const SplashState());
+  SplashCubit(this._isLoggedIn) : super(const SplashState());
 
-  // final AuthRepository _authRepository;
+  final IsLoggedIn _isLoggedIn;
 
   Future<void> start() async {
     emit(const SplashState());
     await Future.delayed(const Duration(seconds: 2));
     try {
-      // final isLoggedIn = await _authRepository.isLoggedIn();
-
-      // if (!isLoggedIn) {
-      //   emit(const SplashState(status: SplashStatus.unauthenticated));
-      //   return;
-      // }
-
-      // Optional: load cached/remote data before entering home
-      // await _productRepository.loadInitialData();
-      if (false) {
+      if (await _isLoggedIn()) {
         emit(const SplashState(status: SplashStatus.authenticated));
       } else {
         emit(const SplashState(status: SplashStatus.unauthenticated));
