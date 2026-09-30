@@ -7,7 +7,6 @@ import 'package:shoplite/features/auth/domain/usecases/logout.dart';
 import 'package:shoplite/features/product/domain/entities/product_entity.dart';
 import 'package:shoplite/features/product/presentation/bloc/product_bloc.dart';
 
-
 class ProductPage extends StatelessWidget {
   const ProductPage({super.key});
 
@@ -225,42 +224,47 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: product.thumbnail == null
-                ? const Center(child: Icon(Icons.image_not_supported))
-                : Image.network(
-                    product.thumbnail!,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        const Center(child: Icon(Icons.broken_image)),
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '\$${product.price.toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
+    return GestureDetector(
+      onTap: () {
+        context.push(AppRouters.productDetails, extra: product);
+      },
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: product.thumbnail == null
+                  ? const Center(child: Icon(Icons.image_not_supported))
+                  : Image.network(
+                      product.thumbnail!,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          const Center(child: Icon(Icons.broken_image)),
+                    ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '\$${product.price.toStringAsFixed(2)}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
