@@ -5,4 +5,6 @@ abstract class ProductRemoteDatasource {
     required int limit,
     required int skip,
   });
+
+  Future<Product> getProduct(int id);
 }

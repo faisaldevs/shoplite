@@ -14,4 +14,7 @@ abstract class ProductApiService {
     @Query("limit") required int limit,
     @Query("skip") required int skip,
   });
+
+  @GET("${ApiEndpoints.products}/{id}")
+  Future<Product> product(@Path("id") int id);
 }

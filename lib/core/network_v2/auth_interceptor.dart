@@ -7,8 +7,9 @@ import 'package:shoplite/core/storage/base_auth_storage.dart';
 /// Adds the access token to every request. On 401 it refreshes the token
 /// once and retries the request. If refresh fails, the session is over.
 ///
-/// QueuedInterceptor handles one request at a time, so parallel 401s
-/// trigger only one refresh.
+/// QueuedInterceptor runs onError one at a time, so parallel 401s never
+/// refresh concurrently. The token check in [_getNewAccessToken] stops
+/// queued 401s from refreshing again after the first one succeeded.
 class AuthInterceptor extends QueuedInterceptor {
   AuthInterceptor({
     required this._storage,
@@ -16,24 +17,25 @@ class AuthInterceptor extends QueuedInterceptor {
     Dio? plainDio,
   }) : _plainDio = plainDio ?? _createPlainDio();
 
-  final BaseAuthStorage _storage;
-
-  final void Function() onSessionExpired;
-
   // No interceptors on this one, so refresh/retry can't loop back here.
   final Dio _plainDio;
+
+  final BaseAuthStorage _storage;
+  final void Function() onSessionExpired;
 
   // Set once the session is ended, so queued 401s don't notify again.
   // Reset when a request goes out with a token (user logged in again).
   bool _sessionExpired = false;
 
-  static Dio _createPlainDio() => Dio(
-    BaseOptions(
-      baseUrl: ApiEndpoints.baseUrl,
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
-    ),
-  );
+  static Dio _createPlainDio() {
+    return Dio(
+      BaseOptions(
+        baseUrl: ApiEndpoints.baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      ),
+    );
+  }
 
   @override
   void onRequest(
@@ -41,10 +43,10 @@ class AuthInterceptor extends QueuedInterceptor {
     RequestInterceptorHandler handler,
   ) async {
     try {
-      final token = await _storage.getAccessToken();
+      final accessToken = await _storage.getAccessToken();
 
-      if (token != null && token.isNotEmpty) {
-        options.headers["Authorization"] = "Bearer $token";
+      if (accessToken != null && accessToken.isNotEmpty) {
+        options.headers["Authorization"] = "Bearer $accessToken";
         _sessionExpired = false;
       }
 
@@ -57,17 +59,28 @@ class AuthInterceptor extends QueuedInterceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     final isUnAuthorized = err.response?.statusCode == 401;
-
     final isLogin = err.requestOptions.path == ApiEndpoints.login;
 
-    if (isUnAuthorized == false || isLogin) return handler.next(err);
+    if (!isUnAuthorized || isLogin) return handler.next(err);
     log('[Auth] 401 on ${err.requestOptions.path} -> refreshing token');
 
     final String accessToken;
 
     try {
-      accessToken = await _getFreshAccessToken(err.requestOptions);
+      accessToken = await _getNewAccessToken(err.requestOptions);
+    } on DioException catch (e) {
+      // Only a server rejection ends the session. Offline/timeout keeps the
+      // tokens so the user stays logged in and can retry later.
+      final status = e.response?.statusCode;
+      if (status == 401 || status == 403) {
+        log('[Auth] Refresh rejected ($status) -> logout');
+        await _endSession();
+      } else {
+        log('[Auth] Refresh failed (${e.type}) -> keep session');
+      }
+      return handler.next(err);
     } catch (e) {
+      // No refresh token, or unexpected refresh response shape.
       log('[Auth] Refresh failed ($e) -> logout');
       await _endSession();
       return handler.next(err);
@@ -103,30 +116,32 @@ class AuthInterceptor extends QueuedInterceptor {
     onSessionExpired();
   }
 
-  Future<String> _getFreshAccessToken(RequestOptions failedRequest) async {
+  Future<String> _getNewAccessToken(RequestOptions failedRequest) async {
     // Another queued request may have refreshed already: reuse that token.
-    final currentToken = await _storage.getAccessToken();
+    final currentAccessToken = await _storage.getAccessToken();
 
-    if (currentToken != null &&
-        failedRequest.headers["Authorization"] != 'Bearer $currentToken') {
+    if (currentAccessToken != null &&
+        failedRequest.headers["Authorization"] !=
+            "Bearer $currentAccessToken") {
       log('[Auth] Token already refreshed by another request');
-      return currentToken;
+      return currentAccessToken;
     }
 
-    final currentRefreshToken = await _storage.getRefreshToken();
+    final refreshToken = await _storage.getRefreshToken();
 
-    if (currentRefreshToken == null) throw StateError("NO Refresh Token");
-    
+    if (refreshToken == null) throw StateError("No Refresh Token");
+
     final response = await _plainDio.post(
       ApiEndpoints.refresh,
-      data: {"refreshToken": currentRefreshToken},
+      data: {"refreshToken": refreshToken},
     );
-    final newAccessToken = response.data["accessToken"] as String;
-    final newRefreshToken = response.data["refreshToken"] as String;
 
-    await _storage.saveTokens(newAccessToken, newRefreshToken);
-    log('[Auth] Token refreshed');
+    final newAccess = response.data["accessToken"] as String;
+    final newRefresh = response.data["refreshToken"] as String;
 
-    return newAccessToken;
+    await _storage.saveTokens(newAccess, newRefresh);
+    log('[Auth] Access & refresh tokens saved');
+
+    return newAccess;
   }
 }

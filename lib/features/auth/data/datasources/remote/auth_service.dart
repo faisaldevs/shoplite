@@ -10,7 +10,5 @@ abstract class AuthService {
   factory AuthService(Dio dio, {String? baseUrl}) = _AuthService;
 
   @POST(ApiEndpoints.login)
-  Future<LoginResponseModel> login(
-    @Body() Map<String, dynamic> credentials,
-  );
+  Future<LoginResponseModel> login(@Body() Map<String, dynamic> credentials);
 }

@@ -14,4 +14,7 @@ class ProductRemoteDatasourceImpl implements ProductRemoteDatasource {
   }) {
     return _api.products(limit: limit, skip: skip);
   }
+
+  @override
+  Future<Product> getProduct(int id) => _api.product(id);
 }

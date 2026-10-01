@@ -1,6 +1,52 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shoplite/core/di/di.dart';
 import 'package:shoplite/features/product/domain/entities/product_entity.dart';
+import 'package:shoplite/features/product/presentation/cubit/product_details_cubit.dart';
 import 'package:shoplite/features/product/presentation/pages/full_image_page.dart';
+
+/// Loads product [id] (network, then cache when offline). [initial] is shown
+/// right away when coming from the list.
+class ProductDetailsPage extends StatelessWidget {
+  const ProductDetailsPage({super.key, required this.id, this.initial});
+
+  final int id;
+  final ProductEntity? initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => sl<ProductDetailsCubit>(param1: initial)..load(id),
+      child: BlocBuilder<ProductDetailsCubit, ProductDetailsState>(
+        builder: (context, state) {
+          final product = state.product;
+          // Keep showing what we have, even if the refresh failed.
+          if (product != null) return ProductDetailsScreen(product: product);
+
+          return Scaffold(
+            appBar: AppBar(title: const Text('Product Details')),
+            body: Center(
+              child: state.status == ProductDetailsStatus.failure
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(state.errorMessage ?? 'Something went wrong'),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: () =>
+                              context.read<ProductDetailsCubit>().load(id),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    )
+                  : const CircularProgressIndicator(),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
 class ProductDetailsScreen extends StatelessWidget {
   final ProductEntity product;

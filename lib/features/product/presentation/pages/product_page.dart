@@ -226,7 +226,7 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        context.push(AppRouters.productDetails, extra: product);
+        context.push(AppRouters.productDetailsPath(product.id), extra: product);
       },
       child: Card(
         clipBehavior: Clip.antiAlias,

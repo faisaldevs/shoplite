@@ -1,17 +1,17 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shoplite/core/network/api_endpoints.dart';
-import 'package:shoplite/core/network/auth_interceptor.dart';
+import 'package:shoplite/core/network_v2/auth_interceptor.dart';
 
 class DioClient {
   DioClient._();
 
-  static Dio create(AuthInterceptor auth) {
+  static Dio dioCreate(AuthInterceptor auth) {
     return Dio(
         BaseOptions(
           baseUrl: ApiEndpoints.baseUrl,
-          receiveTimeout: const Duration(seconds: 30),
           connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
         ),
       )
       ..interceptors.addAll([

@@ -16,22 +16,12 @@ class ProductsTable extends Table {
   TextColumn get images => text()
       .map(const StringListConverter())
       .withDefault(const Constant("[]"))();
-  IntColumn get position => integer()();
+
+  /// Index in the cached product list. Null for rows cached only from the
+  /// details endpoint, or rows dropped from the list by a refresh.
+  IntColumn get position => integer().nullable()();
   DateTimeColumn get cachedAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
   Set<Column>? get primaryKey => {id};
 }
-
-/*
-  final int id;
-  final String title;
-  final String description;
-  final String category;
-  final double price;
-  final double discountPercentage;
-  final double rating;
-  final int stock;
-  final String? thumbnail;
-  final List<String> images;
-*/

@@ -78,9 +78,9 @@ class _LoginPageViewState extends State<LoginPageView> {
                     ).showSnackBar(SnackBar(content: Text("Login Successful")));
                     context.go(AppRouters.product);
                   } else if (state.status == LoginStatus.failure) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text("Login Failed")));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(state.error ?? "Login Failed")),
+                    );
                   }
                 },
                 builder: (context, state) {

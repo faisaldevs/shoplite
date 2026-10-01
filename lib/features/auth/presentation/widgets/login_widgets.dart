@@ -14,10 +14,9 @@ class CustomTextFieldWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
-      decoration:  InputDecoration(
+      decoration: InputDecoration(
         border: OutlineInputBorder(),
         labelText: labelText,
-        
       ),
     );
   }

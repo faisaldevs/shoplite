@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shoplite/core/error/excptions.dart';
+import 'package:shoplite/core/error/exceptions.dart';
 import 'package:shoplite/core/storage/base_auth_storage.dart';
 
 class AuthStorage implements BaseAuthStorage {

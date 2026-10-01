@@ -9,7 +9,9 @@ class AppRouters {
   static const String splash = '/';
   static const String login = '/login';
   static const String product = '/product';
-  static const String productDetails = '/product_details';
+  static const String productDetails = '/product_details/:id';
+
+  static String productDetailsPath(int id) => '/product_details/$id';
 }
 
 final router = GoRouter(
@@ -30,8 +32,10 @@ final router = GoRouter(
     GoRoute(
       path: AppRouters.productDetails,
       builder: (context, state) {
-        final product = state.extra as ProductEntity;
-        return ProductDetailsScreen(product: product);
+        final id = int.parse(state.pathParameters['id']!);
+        // extra is lost on deep links / app restore; the page reloads by id.
+        final initial = state.extra as ProductEntity?;
+        return ProductDetailsPage(id: id, initial: initial);
       },
     ),
   ],

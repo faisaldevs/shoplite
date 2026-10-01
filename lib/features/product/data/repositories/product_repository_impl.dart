@@ -1,50 +1,72 @@
 import 'dart:developer';
 
-import 'package:dio/dio.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:shoplite/core/error/error_handler.dart';
 import 'package:shoplite/core/error/failure.dart';
+import 'package:shoplite/features/product/data/datasources/local/product_local_datasource.dart';
 import 'package:shoplite/features/product/data/datasources/remote/product_remote_datasource.dart';
+import 'package:shoplite/features/product/data/models/product_mapper.dart';
 import 'package:shoplite/features/product/domain/entities/paginated_products.dart';
+import 'package:shoplite/features/product/domain/entities/product_entity.dart';
 import 'package:shoplite/features/product/domain/repositories/product_repository.dart';
 
+/// Network first. When the device is offline, falls back to the local cache.
 class ProductRepositoryImpl implements ProductRepository {
-  final ProductRemoteDatasource _datasource;
+  final ProductRemoteDatasource _remote;
+  final ProductLocalDatasource _local;
 
-  const ProductRepositoryImpl(this._datasource);
+  const ProductRepositoryImpl({required this._remote, required this._local});
 
   @override
   Future<Either<Failure, PaginatedProducts>> getProducts({
     required int limit,
     required int skip,
-  }) async {
+  }) => guard(() async {
     try {
-      final products = await _datasource.getProducts(limit: limit, skip: skip);
-
-      return Right(products.toEntity());
-    } on DioException catch (e) {
-      log(e.toString());
-      return left(_mapDioError(e));
+      final response = await _remote.getProducts(limit: limit, skip: skip);
+      await _cacheSafely(
+        () => _local.cacheProducts(response.products ?? [], skip: skip),
+      );
+      return response.toEntity();
     } catch (e) {
-      return const Left(UnknownFailure());
-    }
-  }
+      if (mapError(e) is! NetworkFailure) rethrow;
 
-  Failure _mapDioError(DioException e) {
-    switch (e.type) {
-      case DioExceptionType.connectionError:
-        return const NetworkFailure();
-      case DioExceptionType.receiveTimeout:
-        return const NetworkFailure();
-      case DioExceptionType.badResponse:
-        final code = e.response?.statusCode;
-        if (code == 401) return const UnauthorizedFailure();
-        final data = e.response?.data;
-        final message = data is Map && data['message'] is String
-            ? data['message'] as String
-            : 'Server error';
-        return ServerFailure(message: message, code: code);
-      default:
-        return const UnknownFailure();
+      final rows = await _local.getProducts(limit: limit, skip: skip);
+      // Nothing cached yet: show the original "no internet" error.
+      if (rows.isEmpty && skip == 0) rethrow;
+
+      return PaginatedProducts(
+        products: rows.map((r) => r.toEntity()).toList(),
+        // Offline, the cached list is all there is, so paging stops at its end.
+        total: await _local.countProducts(),
+        limit: limit,
+        skip: skip,
+      );
+    }
+  });
+
+  @override
+  Future<Either<Failure, ProductEntity>> getProductDetails(int id) =>
+      guard(() async {
+        try {
+          final product = await _remote.getProduct(id);
+          await _cacheSafely(() => _local.cacheProduct(product));
+          return product.toEntity();
+        } catch (e) {
+          if (mapError(e) is! NetworkFailure) rethrow;
+
+          final row = await _local.getProduct(id);
+          if (row == null) rethrow;
+          return row.toEntity();
+        }
+      });
+
+  /// A failed cache write must not fail a request that already succeeded.
+  Future<void> _cacheSafely(Future<void> Function() write) async {
+    try {
+      await write();
+    } catch (e, st) {
+      log('[ProductCache] write failed: $e', stackTrace: st);
     }
   }
 }

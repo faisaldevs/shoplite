@@ -1,5 +1,7 @@
-import 'package:dio/dio.dart';
+import 'dart:developer';
+
 import 'package:fpdart/fpdart.dart';
+import 'package:shoplite/core/error/error_handler.dart';
 import 'package:shoplite/core/error/failure.dart';
 import 'package:shoplite/core/storage/base_auth_storage.dart';
 import 'package:shoplite/features/auth/data/datasources/remote/auth_remote_datasource.dart';
@@ -17,8 +19,16 @@ class AuthRepositoryImpl implements AuthRepository {
   });
 
   // dummyjson has no logout endpoint, so logout = forget the tokens.
+  // Never throws: the user must always be able to leave, even if
+  // clearing storage fails.
   @override
-  Future<void> logout() => _authStorage.clearTokens();
+  Future<void> logout() async {
+    try {
+      await _authStorage.clearTokens();
+    } catch (e) {
+      log('[Auth] Clearing tokens on logout failed ($e)');
+    }
+  }
 
   // Only checks a token exists. If it expired, AuthInterceptor refreshes it
   // on the first request.
@@ -31,37 +41,11 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, LoginEntity>> login(
     String username,
     String password,
-  ) async {
-    try {
-      final login = await _remoteDatasource.login(username, password);
+  ) => guard(() async {
+    final login = await _remoteDatasource.login(username, password);
 
-      await _authStorage.saveTokens(login.accessToken, login.refreshToken);
+    await _authStorage.saveTokens(login.accessToken, login.refreshToken);
 
-      return Right(login.toEntity());
-    } on DioException catch (e) {
-      return Left(_mapDioError(e));
-    } catch (e) {
-      return const Left(UnknownFailure());
-    }
-  }
-
-  Failure _mapDioError(DioException e) {
-    switch (e.type) {
-      case DioExceptionType.connectionError:
-      case DioExceptionType.receiveTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.connectionTimeout:
-        return const NetworkFailure();
-      case DioExceptionType.badResponse:
-        final code = e.response?.statusCode;
-        if (code == 401) return const UnauthorizedFailure();
-        final data = e.response?.data;
-        final message = data is Map && data['message'] is String
-            ? data['message'] as String
-            : 'Server error';
-        return ServerFailure(message: message, code: code);
-      default:
-        return const UnknownFailure();
-    }
-  }
+    return login.toEntity();
+  });
 }

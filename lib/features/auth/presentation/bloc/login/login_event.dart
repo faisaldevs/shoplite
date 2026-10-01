@@ -1,5 +1,5 @@
-sealed class LoginEvent  {
-const LoginEvent();
+sealed class LoginEvent {
+  const LoginEvent();
 }
 
 class LoginButtonPressed extends LoginEvent {
